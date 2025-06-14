@@ -14,6 +14,8 @@ namespace GISCourse2025.Data
             optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=gis-project;Username=postgres;Password=postgres",
                 o => o.UseNetTopologySuite());
         }
+        public DbSet<GISCourse2025.Models.viewpoints> viewpoints { get; set; }
         public DbSet<GISCourse2025.Models.hikingTrails> hikingTrails { get; set; }
+        public DbSet<GISCourse2025.Models.parks> parks { get; set; }
     }
 }

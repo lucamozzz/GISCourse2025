@@ -1,7 +1,7 @@
-@model IEnumerable<GISCourse2025.Models.hikingTrails>
+@model IEnumerable<GISCourse2025.Models.viewpoints>
 
 @{
-    ViewData["Title"] = "HikingTrails";
+    ViewData["Title"] = "Viewpoints";
     var currentPage = ViewBag.CurrentPage as int? ?? 1;
     var totalPages = ViewBag.TotalPages as int? ?? 1;
 }
@@ -11,7 +11,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenLayers Line</title>
+    <title>OpenLayers Point</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css">
     <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
 </head>
@@ -21,41 +21,41 @@
         <tr>
             <td width="20%" style="vertical-align: top;">
                 <div style="margin-top: 20%; margin-right: 10%;">
-                    <h3 style="text-align: right;">List of Hiking Trails</h3>
-                    @foreach (hikingTrails m in Model)
+                    <h3 style="text-align: right;">List of Viewpoints</h3>
+                    @foreach (viewpoints m in Model)
                     {
                         <h5 style="text-align: right;">
-                            <a class="text-dark" style="text-decoration: none;" href="#" onclick="loadLine(@m.id)">
+                            <a class="text-dark" style="text-decoration: none;" href="#" onclick="loadPoint(@m.id)">
                                 @m.name
                             </a>
-                            <a href="#" onclick="deleteLine(@m.id)"
+                            <a href="#" onclick="deletePoint(@m.id)"
                                 style="color:red; text-decoration:none; margin-left:8px;">&#10005;</a>
                         </h5>
                     }
                 </div>
             </td>
             <td valign="top">
-                <h2>Hiking Trails</h2>
+                <h2>Viewpoints</h2>
                 <div id="map" style="width: 100%; height: 800px; float:right;"></div>
             </td>
             <td width="20%" style="vertical-align: top;">
                 <div style="margin-top: 20%; margin-left: 10%;">
-                    <h3>Add Hiking Trail</h3>
+                    <h3>Add Viewpoint</h3>
                     <form id="addForm" onsubmit="event.preventDefault();">
                         <label for="add_name">Name:</label><br>
                         <input type="text" id="add_name" name="add_name" required><br><br>
                         <button type="button" onclick="startDrawing()">Start Drawing</button>
                         <button type="button" onclick="clearDrawing()">Clear Drawing</button>
-                        <button type="button" onclick="saveNewTrail()">Save Trail</button>
+                        <button type="button" onclick="saveNewPoint()">Save Point</button>
                     </form>
                 </div>
                 <div style="margin-top: 20%; margin-left: 10%;">
-                    <h3>Update Hiking Trail</h3>
+                    <h3>Update Viewpoint</h3>
                     <form id="updateForm" onsubmit="event.preventDefault();">
                         <label for="name">Name:</label>
                         <input type="text" id="update_name" name="update_name" required><br><br>
                         <button type="button"
-                            onclick="updateLine(currentID, document.getElementById('update_name').value)">Update</button>
+                            onclick="updatePoint(currentID, document.getElementById('update_name').value)">Update</button>
                     </form>
                 </div>
             </td>
@@ -69,6 +69,7 @@
         var modify = null;
         var drawInteraction = null;
         var drawnFeature = null;
+        let currentID = null; // add this at the top of your script
 
         function InitMap() {
             map = new ol.Map({
@@ -98,7 +99,7 @@
 
             drawInteraction = new ol.interaction.Draw({
                 source: vectorSource,
-                type: 'LineString'
+                type: 'Point' // 👈 CAMBIATO da 'LineString'
             });
 
             drawInteraction.on('drawend', function (event) {
@@ -120,9 +121,9 @@
             drawnFeature = null;
         }
 
-        async function saveNewTrail() {
+        async function saveNewPoint() {
             if (!drawnFeature) {
-                alert("Please draw a line first.");
+                alert("Please draw a point first.");
                 return;
             }
 
@@ -132,14 +133,17 @@
                 return;
             }
 
-            const geometry = drawnFeature.getGeometry().getCoordinates();
-            const coordinates = geometry.map(coord => [coord[0], coord[1]]); // [x, y] (EPSG:3857)
+            const format = new ol.format.WKT();
+            const wkt = format.writeFeature(drawnFeature, {
+                dataProjection: 'EPSG:3857',
+                featureProjection: 'EPSG:3857'
+            });
 
             const body = {
-                coordinates: coordinates
+                wkt: wkt
             };
 
-            const response = await fetch(`../../api/map/add?name=${encodeURIComponent(name)}`, {
+            const response = await fetch(`../../api/viewpoints/add?name=${encodeURIComponent(name)}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -148,28 +152,26 @@
             });
 
             if (!response.ok) {
-                console.error("Failed to save new trail");
+                console.error("Failed to save new point");
             } else {
-                console.log("Trail added successfully");
+                console.log("Point added successfully");
                 location.reload();
             }
         }
 
-        async function loadLine(id) {
-            // Get trail info (e.g., name) from an API endpoint or use the DOM if you already have the name
-            const response = await fetch('../../api/map/' + id);
+        async function loadPoint(id) {
+            const response = await fetch('../../api/viewpoints/' + id);
             if (!response.ok) {
-                console.error("Failed to load Line:" + id);
+                console.error("Failed to load Point: " + id);
                 return;
             }
 
-            const trailData = await response.json(); // response should now return an object like { id: 1, name: "Path 1", wkt: "..." }
-            const wkt = trailData.wkt;
+            const viewpointData = await response.json();
+            const wkt = viewpointData.wkt;
 
             currentID = id;
-            document.getElementById('update_name').value = trailData.name;
+            document.getElementById('update_name').value = viewpointData.name;
 
-            // Map visualization
             var format = new ol.format.WKT();
             var feature = format.readFeature(wkt, {
                 dataProjection: 'EPSG:3857',
@@ -180,13 +182,8 @@
 
             if (modify) {
                 map.removeInteraction(modify);
+                modify = null;
             }
-            modify = new ol.interaction.Modify({
-                source: new ol.source.Vector({
-                    features: [currentFeature]
-                })
-            });
-            map.addInteraction(modify);
 
             if (currentLayer)
                 map.removeLayer(currentLayer);
@@ -196,24 +193,35 @@
                     features: [feature]
                 }),
                 style: new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: 'red',
-                        width: 4
+                    image: new ol.style.Circle({
+                        radius: 7,
+                        fill: new ol.style.Fill({ color: 'red' }),
+                        stroke: new ol.style.Stroke({ color: 'white', width: 2 })
                     })
                 })
             });
 
             map.addLayer(currentLayer);
 
-            var extent = feature.getGeometry().getExtent();
+            modify = new ol.interaction.Modify({
+                source: currentLayer.getSource()
+            });
+            map.addInteraction(modify);
+            modify.on('modifyend', function (event) {
+                event.features.forEach(function (feature) {
+                    currentFeature = feature;
+                });
+            });
+
+            const extent = feature.getGeometry().getExtent();
             map.getView().fit(extent, {
                 padding: [50, 50, 50, 50],
-                maxZoom: 16,
+                maxZoom: 18,
                 duration: 500
             });
         }
 
-        async function updateLine(id, name) {
+        async function updatePoint(id, name) {
             if (!currentFeature) {
                 console.error("No feature loaded.");
                 return;
@@ -231,7 +239,7 @@
                 wkt: wkt
             };
 
-            const response = await fetch('../../api/map/update', {
+            const response = await fetch('../../api/viewpoints/update', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -240,22 +248,22 @@
             });
 
             if (!response.ok) {
-                console.error("Failed to update Line");
+                console.error("Failed to update point");
             } else {
-                console.log("Line updated successfully");
-                location.reload(); // ricarica per aggiornare la lista
+                console.log("Point updated successfully");
+                location.reload();
             }
         }
 
-        async function deleteLine(id) {
-            const response = await fetch('../../api/map/delete/' + id, {
+        async function deletePoint(id) {
+            const response = await fetch('../../api/viewpoints/delete/' + id, {
                 method: 'DELETE'
             });
             if (!response.ok) {
-                console.error("Failed to delete Line");
+                console.error("Failed to delete point");
                 return;
             } else {
-                console.log("Line deleted successfully");
+                console.log("Point deleted successfully");
                 location.reload();
             }
         }

@@ -12,19 +12,19 @@ namespace GISCourse2025.API
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class MapController : ControllerBase
+    public class ParksController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
 
-        public MapController(ApplicationDbContext context)
+        public ParksController(ApplicationDbContext context)
         {
             _context = context;
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetTrail(int id)
+        public IActionResult GetPark(int id)
         {
-            var trail = _context.hikingTrails
+            var park = _context.parks
                 .Where(p => p.id == id)
                 .Select(p => new
                 {
@@ -34,16 +34,16 @@ namespace GISCourse2025.API
                 })
                 .FirstOrDefault();
 
-            if (trail == null)
+            if (park == null)
                 return NotFound();
 
             var wktWriter = new WKTWriter();
-            string wkt = wktWriter.Write(trail.geometry);
+            string wkt = wktWriter.Write(park.geometry);
 
             return Ok(new
             {
-                id = trail.id,
-                name = trail.name,
+                id = park.id,
+                name = park.name,
                 wkt = wkt
             });
         }

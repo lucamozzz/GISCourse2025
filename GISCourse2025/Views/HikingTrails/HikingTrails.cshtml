@@ -69,6 +69,7 @@
         var modify = null;
         var drawInteraction = null;
         var drawnFeature = null;
+        let currentID = null; // add this at the top of your script
 
         function InitMap() {
             map = new ol.Map({
@@ -139,7 +140,7 @@
                 coordinates: coordinates
             };
 
-            const response = await fetch(`../../api/map/add?name=${encodeURIComponent(name)}`, {
+            const response = await fetch(`../../api/hikingtrails/add?name=${encodeURIComponent(name)}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -157,7 +158,7 @@
 
         async function loadLine(id) {
             // Get trail info (e.g., name) from an API endpoint or use the DOM if you already have the name
-            const response = await fetch('../../api/map/' + id);
+            const response = await fetch('../../api/hikingtrails/' + id);
             if (!response.ok) {
                 console.error("Failed to load Line:" + id);
                 return;
@@ -231,7 +232,7 @@
                 wkt: wkt
             };
 
-            const response = await fetch('../../api/map/update', {
+            const response = await fetch('../../api/hikingtrails/update', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -248,7 +249,7 @@
         }
 
         async function deleteLine(id) {
-            const response = await fetch('../../api/map/delete/' + id, {
+            const response = await fetch('../../api/hikingtrails/delete/' + id, {
                 method: 'DELETE'
             });
             if (!response.ok) {
