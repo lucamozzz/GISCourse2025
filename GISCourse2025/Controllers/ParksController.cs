@@ -19,7 +19,7 @@ namespace GISCourse2025.Controllers
                 .OrderBy(k => k.name)
                 .Take(15)
                 .ToList();
-            return View("ParksController", parks1);
+            return View("Parks", parks1);
         }
     }
 }

@@ -1,7 +1,7 @@
-@model IEnumerable<GISCourse2025.Models.hikingTrails>
+@model IEnumerable<GISCourse2025.Models.parks>
 
 @{
-    ViewData["Title"] = "HikingTrails";
+    ViewData["Title"] = "Parks";
     var currentPage = ViewBag.CurrentPage as int? ?? 1;
     var totalPages = ViewBag.TotalPages as int? ?? 1;
 }
@@ -11,7 +11,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenLayers Line</title>
+    <title>Parks Map</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css">
     <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
 </head>
@@ -21,41 +21,41 @@
         <tr>
             <td width="20%" style="vertical-align: top;">
                 <div style="margin-top: 20%; margin-right: 10%;">
-                    <h3 style="text-align: right;">List of Hiking Trails</h3>
-                    @foreach (hikingTrails m in Model)
+                    <h3 style="text-align: right;">List of Parks</h3>
+                    @foreach (parks m in Model)
                     {
                         <h5 style="text-align: right;">
-                            <a class="text-dark" style="text-decoration: none;" href="#" onclick="loadLine(@m.id)">
+                            <a class="text-dark" style="text-decoration: none;" href="#" onclick="loadPark(@m.id)">
                                 @m.name
                             </a>
-                            <a href="#" onclick="deleteLine(@m.id)"
+                            <a href="#" onclick="deletePark(@m.id)"
                                 style="color:red; text-decoration:none; margin-left:8px;">&#10005;</a>
                         </h5>
                     }
                 </div>
             </td>
             <td valign="top">
-                <h2>Hiking Trails</h2>
-                <div id="map" style="width: 100%; height: 800px; float:right;"></div>
+                <h2>Parks</h2>
+                <div id="map" style="width: 100%; height: 800px;"></div>
             </td>
             <td width="20%" style="vertical-align: top;">
                 <div style="margin-top: 20%; margin-left: 10%;">
-                    <h3>Add Hiking Trail</h3>
+                    <h3>Add Park</h3>
                     <form id="addForm" onsubmit="event.preventDefault();">
                         <label for="add_name">Name:</label><br>
                         <input type="text" id="add_name" name="add_name" required><br><br>
                         <button type="button" onclick="startDrawing()">Start Drawing</button>
                         <button type="button" onclick="clearDrawing()">Clear Drawing</button>
-                        <button type="button" onclick="saveNewTrail()">Save Trail</button>
+                        <button type="button" onclick="saveNewPark()">Save Park</button>
                     </form>
                 </div>
                 <div style="margin-top: 20%; margin-left: 10%;">
-                    <h3>Update Hiking Trail</h3>
+                    <h3>Update Park</h3>
                     <form id="updateForm" onsubmit="event.preventDefault();">
-                        <label for="name">Name:</label>
+                        <label for="update_name">Name:</label>
                         <input type="text" id="update_name" name="update_name" required><br><br>
                         <button type="button"
-                            onclick="updateLine(currentID, document.getElementById('update_name').value)">Update</button>
+                            onclick="updatePark(currentID, document.getElementById('update_name').value)">Update</button>
                     </form>
                 </div>
             </td>
@@ -69,6 +69,7 @@
         var modify = null;
         var drawInteraction = null;
         var drawnFeature = null;
+        var currentID = null;
 
         function InitMap() {
             map = new ol.Map({
@@ -86,9 +87,7 @@
         }
 
         function startDrawing() {
-            if (drawInteraction) {
-                map.removeInteraction(drawInteraction);
-            }
+            clearDrawing(); // Clear any previous interaction
 
             const vectorSource = new ol.source.Vector({ wrapX: false });
             currentLayer = new ol.layer.Vector({
@@ -98,7 +97,7 @@
 
             drawInteraction = new ol.interaction.Draw({
                 source: vectorSource,
-                type: 'LineString'
+                type: 'Polygon'
             });
 
             drawInteraction.on('drawend', function (event) {
@@ -120,9 +119,9 @@
             drawnFeature = null;
         }
 
-        async function saveNewTrail() {
+        async function saveNewPark() {
             if (!drawnFeature) {
-                alert("Please draw a line first.");
+                alert("Please draw a polygon first.");
                 return;
             }
 
@@ -132,46 +131,65 @@
                 return;
             }
 
-            const geometry = drawnFeature.getGeometry().getCoordinates();
-            const coordinates = geometry.map(coord => [coord[0], coord[1]]); // [x, y] (EPSG:3857)
+            // Clona e trasforma la geometria da 3857 a 4326
+            @* const geometry = drawnFeature.getGeometry().clone();
+            geometry.transform('EPSG:3857', 'EPSG:4326'); *@
 
-            const body = {
-                coordinates: coordinates
-            };
+            const geometry = drawnFeature.getGeometry()
+            const type = geometry.getType();
+            let polygons = [];
 
-            const response = await fetch(`../../api/map/add?name=${encodeURIComponent(name)}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-
-            if (!response.ok) {
-                console.error("Failed to save new trail");
+            if (type === 'Polygon') {
+                const rings = geometry.getCoordinates();
+                polygons = [rings];
+            } else if (type === 'MultiPolygon') {
+                polygons = geometry.getCoordinates();
             } else {
-                console.log("Trail added successfully");
-                location.reload();
-            }
-        }
-
-        async function loadLine(id) {
-            // Get trail info (e.g., name) from an API endpoint or use the DOM if you already have the name
-            const response = await fetch('../../api/map/' + id);
-            if (!response.ok) {
-                console.error("Failed to load Line:" + id);
+                alert("Unsupported geometry type: " + type);
                 return;
             }
 
-            const trailData = await response.json(); // response should now return an object like { id: 1, name: "Path 1", wkt: "..." }
-            const wkt = trailData.wkt;
+            const body = {
+                name: name,
+                Polygons: polygons
+            };
+
+            try {
+                const response = await fetch(`../../api/parks/add?name=${encodeURIComponent(name)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ Polygons: polygons }) // solo Polygons nel body
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error("Failed to save new park:", errText);
+                    alert("Error: " + errText);
+                } else {
+                    console.log("Park added successfully");
+                    location.reload();
+                }
+            } catch (err) {
+                console.error("Request failed", err);
+                alert("Unexpected error occurred.");
+            }
+        }
+
+        async function loadPark(id) {
+            const response = await fetch('../../api/parks/' + id);
+            if (!response.ok) {
+                console.error("Failed to load park: " + id);
+                return;
+            }
+
+            const parkData = await response.json();
+            const wkt = parkData.wkt;
 
             currentID = id;
-            document.getElementById('update_name').value = trailData.name;
+            document.getElementById('update_name').value = parkData.name;
 
-            // Map visualization
-            var format = new ol.format.WKT();
-            var feature = format.readFeature(wkt, {
+            const format = new ol.format.WKT();
+            const feature = format.readFeature(wkt, {
                 dataProjection: 'EPSG:3857',
                 featureProjection: 'EPSG:3857'
             });
@@ -188,8 +206,9 @@
             });
             map.addInteraction(modify);
 
-            if (currentLayer)
+            if (currentLayer) {
                 map.removeLayer(currentLayer);
+            }
 
             currentLayer = new ol.layer.Vector({
                 source: new ol.source.Vector({
@@ -197,15 +216,18 @@
                 }),
                 style: new ol.style.Style({
                     stroke: new ol.style.Stroke({
-                        color: 'red',
-                        width: 4
+                        color: 'green',
+                        width: 3
+                    }),
+                    fill: new ol.style.Fill({
+                        color: 'rgba(0, 128, 0, 0.2)'
                     })
                 })
             });
 
             map.addLayer(currentLayer);
 
-            var extent = feature.getGeometry().getExtent();
+            const extent = feature.getGeometry().getExtent();
             map.getView().fit(extent, {
                 padding: [50, 50, 50, 50],
                 maxZoom: 16,
@@ -213,14 +235,14 @@
             });
         }
 
-        async function updateLine(id, name) {
+        async function updatePark(id, name) {
             if (!currentFeature) {
-                console.error("No feature loaded.");
+                alert("No park loaded to update.");
                 return;
             }
 
-            var format = new ol.format.WKT();
-            var wkt = format.writeFeature(currentFeature, {
+            const format = new ol.format.WKT();
+            const wkt = format.writeFeature(currentFeature, {
                 dataProjection: 'EPSG:3857',
                 featureProjection: 'EPSG:3857'
             });
@@ -231,7 +253,7 @@
                 wkt: wkt
             };
 
-            const response = await fetch('../../api/map/update', {
+            const response = await fetch('../../api/parks/update', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -240,22 +262,21 @@
             });
 
             if (!response.ok) {
-                console.error("Failed to update Line");
+                console.error("Failed to update park");
             } else {
-                console.log("Line updated successfully");
-                location.reload(); // ricarica per aggiornare la lista
+                console.log("Park updated successfully");
+                location.reload();
             }
         }
 
-        async function deleteLine(id) {
-            const response = await fetch('../../api/map/delete/' + id, {
+        async function deletePark(id) {
+            const response = await fetch('../../api/parks/delete/' + id, {
                 method: 'DELETE'
             });
             if (!response.ok) {
-                console.error("Failed to delete Line");
-                return;
+                console.error("Failed to delete park");
             } else {
-                console.log("Line deleted successfully");
+                console.log("Park deleted successfully");
                 location.reload();
             }
         }

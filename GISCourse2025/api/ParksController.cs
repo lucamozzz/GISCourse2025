@@ -7,6 +7,7 @@ using System.Text.Json;
 using GISCourse2025.Data;
 using GISCourse2025.Models;
 using NetTopologySuite.IO;
+using NetTopologySuite;
 
 namespace GISCourse2025.API
 {
@@ -22,7 +23,7 @@ namespace GISCourse2025.API
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetPark(int id)
+        public IActionResult GetPark(long id)
         {
             var park = _context.parks
                 .Where(p => p.id == id)
@@ -38,7 +39,7 @@ namespace GISCourse2025.API
                 return NotFound();
 
             var wktWriter = new WKTWriter();
-            string wkt = wktWriter.Write(park.geometry);
+            string wkt = wktWriter.Write(park.geometry); // This can be Polygon or MultiPolygon
 
             return Ok(new
             {
@@ -49,30 +50,78 @@ namespace GISCourse2025.API
         }
 
         [HttpPost("add")]
-        public virtual IActionResult Add([FromQuery] string name, [FromBody] LineStringDto geometryDto)
+        public IActionResult Add([FromQuery] string name, [FromBody] MultiPolygonDto geometryDto)
         {
-            if (string.IsNullOrWhiteSpace(name) || geometryDto?.Coordinates == null || geometryDto.Coordinates.Length < 2)
-                return BadRequest("Name and geometry must be provided with at least 2 points.");
+            if (string.IsNullOrWhiteSpace(name) || geometryDto?.Polygons == null || geometryDto.Polygons.Count == 0)
+                return BadRequest("Name and geometry must be provided with at least one polygon.");
 
             try
             {
-                var coordinates = geometryDto.Coordinates
-                    .Select(coord => new Coordinate(coord[0], coord[1]))
-                    .ToArray();
+                var geometryFactory = NtsGeometryServices.Instance.CreateGeometryFactory(srid: 3857);
 
-                var geometry = new LineString(coordinates); // create NetTopologySuite geometry
-
-                var entity = new hikingTrails
+                var polygons = geometryDto.Polygons.Select(ringList =>
                 {
-                    id = new Random().Next(1000000000, 2000000000),
+                    var shellCoords = ringList[0].Select(c => new Coordinate(c[0], c[1])).ToArray();
+                    var shell = geometryFactory.CreateLinearRing(shellCoords);
+
+                    var holes = ringList.Skip(1).Select(hole =>
+                    {
+                        var holeCoords = hole.Select(c => new Coordinate(c[0], c[1])).ToArray();
+                        return geometryFactory.CreateLinearRing(holeCoords);
+                    }).ToArray();
+
+                    return geometryFactory.CreatePolygon(shell, holes);
+                }).ToArray();
+
+                var multiPolygon = geometryFactory.CreateMultiPolygon(polygons);
+
+                var entity = new parks
+                {
+                    id = Random.Shared.Next(1_000_000_000, 2_000_000_000),
                     name = name,
-                    geometry = geometry
+                    geometry = multiPolygon
                 };
 
-                _context.Set<hikingTrails>().Add(entity);
+                _context.parks.Add(entity);
                 _context.SaveChanges();
 
                 return Ok(entity.id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex); // Log completo
+                return StatusCode(500, "Server error: " + ex.Message);
+            }
+        }
+
+        [HttpPut("update")]
+        public IActionResult UpdatePark([FromBody] ParkUpdateDTO data)
+        {
+            var park = _context.parks.FirstOrDefault(p => p.id == data.id);
+            if (park == null)
+                return NotFound();
+
+            park.name = data.name;
+
+            try
+            {
+                var reader = new WKTReader();
+                var geometry = reader.Read(data.wkt);
+
+                if (geometry == null || !(geometry is MultiPolygon || geometry is Polygon))
+                    return BadRequest("Invalid geometry type. Expected Polygon or MultiPolygon.");
+
+                // If a single Polygon is received, wrap it in a MultiPolygon for consistency
+                if (geometry is Polygon singlePolygon)
+                {
+                    var factory = NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
+                    geometry = factory.CreateMultiPolygon(new[] { singlePolygon });
+                }
+
+                park.geometry = geometry;
+                _context.SaveChanges();
+
+                return Ok();
             }
             catch (Exception ex)
             {
@@ -80,61 +129,20 @@ namespace GISCourse2025.API
             }
         }
 
-
-        // [HttpPut("update/{id}/{name}")]
-        // public IActionResult UpdateName(int id, string name)
-        // {
-        //     if (string.IsNullOrWhiteSpace(name))
-        //         return BadRequest("Name cannot be empty.");
-
-        //     try
-        //     {
-        //         var entity = _context.Set<hikingTrails>().Find(id);
-
-        //         if (entity == null)
-        //             return NotFound($"Entity with id {id} not found.");
-
-        //         entity.name = name;
-        //         _context.SaveChanges();
-
-        //         return Ok();
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         return StatusCode(500, "Server error: " + ex.Message);
-        //     }
-        // }
-
-        [HttpPut("update")]
-        public IActionResult UpdateLine([FromBody] TrailUpdateDTO data)
-        {
-            var trail = _context.hikingTrails.FirstOrDefault(t => t.id == data.id);
-            if (trail == null)
-                return NotFound();
-
-            trail.name = data.name;
-
-            var reader = new WKTReader();
-            trail.geometry = reader.Read(data.wkt);
-
-            _context.SaveChanges();
-            return Ok();
-        }
-
         [HttpDelete("delete/{id}")]
-        public virtual IActionResult Delete(int id)
+        public IActionResult DeletePark(long id)
         {
             try
             {
                 var entity = _context
-                .Set<hikingTrails>()
-                .Find(id);
+                    .Set<parks>()
+                    .Find(id);
 
                 if (entity == null)
-                    return NotFound($"Entity with id {id} not found.");
-                else
-                    _context
-                    .Set<hikingTrails>()
+                    return NotFound($"Park with id {id} not found.");
+
+                _context
+                    .Set<parks>()
                     .Remove(entity);
 
                 _context.SaveChanges();
