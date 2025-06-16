@@ -12,14 +12,38 @@ namespace GISCourse2025.Controllers
         {
             this.context = context;
         }
-        public IActionResult Index()
+        public IActionResult Index(string search, string sacScale, double? minLength, double? maxLength)
         {
-            List<hikingTrails> hikingTrails1 = context.hikingTrails
-                .Where(k => k.id > 0)
-                .OrderBy(k => k.name)
-                .Take(15)
-                .ToList();
-            return View("HikingTrails", hikingTrails1);
+            var hikingTrailsQuery = context.hikingTrails
+                .Where(k => k.id > 0 && k.name != null);
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                hikingTrailsQuery = hikingTrailsQuery.Where(k => k.name.Contains(search));
+            }
+
+            if (!string.IsNullOrEmpty(sacScale))
+            {
+                hikingTrailsQuery = hikingTrailsQuery.Where(k => k.sac_scale == sacScale);
+            }
+
+            if (minLength.HasValue)
+            {
+                hikingTrailsQuery = hikingTrailsQuery.Where(k => k.geometry.Length >= minLength.Value);
+            }
+
+            if (maxLength.HasValue)
+            {
+                hikingTrailsQuery = hikingTrailsQuery.Where(k => k.geometry.Length <= maxLength.Value);
+            }
+
+            ViewBag.Search = search;
+            ViewBag.SacScale = sacScale;
+            ViewBag.MinLength = minLength;
+            ViewBag.MaxLength = maxLength;
+
+            var hikingTrailsList = hikingTrailsQuery.ToList();
+            return View("HikingTrails", hikingTrailsList);
         }
     }
 }

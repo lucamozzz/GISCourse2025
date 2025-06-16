@@ -20,18 +20,36 @@
     <table width="100%">
         <tr>
             <td width="20%" style="vertical-align: top;">
-                <div style="margin-top: 20%; margin-right: 10%;">
-                    <h3 style="text-align: right;">List of Hiking Trails</h3>
-                    @foreach (hikingTrails m in Model)
-                    {
-                        <h5 style="text-align: right;">
-                            <a class="text-dark" style="text-decoration: none;" href="#" onclick="loadLine(@m.id)">
-                                @m.name
-                            </a>
-                            <a href="#" onclick="deleteLine(@m.id)"
-                                style="color:red; text-decoration:none; margin-left:8px;">&#10005;</a>
-                        </h5>
-                    }
+                <form method="get" style="text-align: right; margin-bottom: 10px;">
+                    <input type="text" name="search" placeholder="Search by name" value="@ViewBag.Search" />
+                    <input type="number" step="0.1" name="minLength" placeholder="Min Length (m)"
+                        value="@ViewBag.MinLength" />
+                    <input type="number" step="0.1" name="maxLength" placeholder="Max Length (m)"
+                        value="@ViewBag.MaxLength" />
+                    <select name="sacScale">
+                        <option value="">All difficulties</option>
+                        <option value="hiking">Hiking</option>
+                        <option value="mountain_hiking">Mountain Hiking</option>
+                        <option value="demanding_mountain_hiking">Demanding Mountain Hiking</option>
+                        <option value="alpine_hiking">Alpine Hiking</option>
+                        <option value="demanding_alpine_hiking">Demanding Alpine Hiking</option>
+                        <option value="difficult_alpine_hiking">Difficult Alpine Hiking</option>
+                    </select>
+                    <button type="submit">Filter</button>
+                </form>
+                <div style="margin-top: 20%; margin-right: 10%; max-height: 600px; overflow-y: auto;">
+                    <div>
+                        @foreach (hikingTrails m in Model)
+                        {
+                            <h5 style="text-align: right;">
+                                <a class="text-dark" style="text-decoration: none;" href="#" onclick="loadLine(@m.id)">
+                                    @m.name
+                                </a>
+                                <a href="#" onclick="deleteLine(@m.id)"
+                                    style="color:red; text-decoration:none; margin-left:8px;">&#10005;</a>
+                            </h5>
+                        }
+                    </div>
                 </div>
             </td>
             <td valign="top">
@@ -44,6 +62,8 @@
                     <form id="addForm" onsubmit="event.preventDefault();">
                         <label for="add_name">Name:</label><br>
                         <input type="text" id="add_name" name="add_name" required><br><br>
+                        <label for="add_name">SAC scale:</label><br>
+                        <input type="text" id="add_sac_scale" name="add_sac_scale"><br><br>
                         <button type="button" onclick="startDrawing()">Start Drawing</button>
                         <button type="button" onclick="clearDrawing()">Clear Drawing</button>
                         <button type="button" onclick="saveNewTrail()">Save Trail</button>
@@ -54,8 +74,10 @@
                     <form id="updateForm" onsubmit="event.preventDefault();">
                         <label for="name">Name:</label>
                         <input type="text" id="update_name" name="update_name" required><br><br>
+                        <label for="sac_scale">SAC scale:</label>
+                        <input type="text" id="update_sac_scale" name="update_sac_scale" required><br><br>
                         <button type="button"
-                            onclick="updateLine(currentID, document.getElementById('update_name').value)">Update</button>
+                            onclick="updateLine(currentID, document.getElementById('update_name').value, document.getElementById('update_sac_scale').value)">Update</button>
                     </form>
                 </div>
             </td>
@@ -133,11 +155,14 @@
                 return;
             }
 
+            const sac_scale = document.getElementById('add_sac_scale').value;
+
             const geometry = drawnFeature.getGeometry().getCoordinates();
             const coordinates = geometry.map(coord => [coord[0], coord[1]]); // [x, y] (EPSG:3857)
 
             const body = {
-                coordinates: coordinates
+                coordinates: coordinates,
+                sac_scale: sac_scale
             };
 
             const response = await fetch(`../../api/hikingtrails/add?name=${encodeURIComponent(name)}`, {
@@ -169,6 +194,7 @@
 
             currentID = id;
             document.getElementById('update_name').value = trailData.name;
+            document.getElementById('update_sac_scale').value = trailData.sac_scale;
 
             // Map visualization
             var format = new ol.format.WKT();
@@ -192,13 +218,24 @@
             if (currentLayer)
                 map.removeLayer(currentLayer);
 
+            let color;
+            if (!trailData.sac_scale || trailData.sac_scale.trim() === "") {
+                color = 'green';
+            } else if (trailData.sac_scale === "hiking") {
+                color = 'yellow';
+            } else if (trailData.sac_scale === "mountain_hiking" || trailData.sac_scale === "demanding_mountain_hiking") {
+                color = 'red';
+            } else {
+                color = 'blue';
+            }
+
             currentLayer = new ol.layer.Vector({
                 source: new ol.source.Vector({
                     features: [feature]
                 }),
                 style: new ol.style.Style({
                     stroke: new ol.style.Stroke({
-                        color: 'red',
+                        color: color,
                         width: 4
                     })
                 })
@@ -214,7 +251,7 @@
             });
         }
 
-        async function updateLine(id, name) {
+        async function updateLine(id, name, sac_scale) {
             if (!currentFeature) {
                 console.error("No feature loaded.");
                 return;
@@ -229,6 +266,7 @@
             const body = {
                 id: id,
                 name: name,
+                sac_scale: sac_scale,
                 wkt: wkt
             };
 
@@ -263,6 +301,35 @@
 
         InitMap();
     </script>
+    <br>
+    <br>
+    <div style="
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    padding: 10px 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-family: sans-serif;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    z-index: 1000;
+">
+        <strong>SAC Scale Legend</strong><br>
+        <div><span
+                style="display:inline-block; width:12px; height:12px; background:green; margin-right:8px;"></span>Uncategorized
+        </div>
+        <div><span
+                style="display:inline-block; width:12px; height:12px; background:yellow; margin-right:8px;"></span>Hikings
+        </div>
+        <div><span
+                style="display:inline-block; width:12px; height:12px; background:red; margin-right:8px;"></span>Mountain
+            Hikings</div>
+        <div><span
+                style="display:inline-block; width:12px; height:12px; background:blue; margin-right:8px;"></span>Alpine
+            Hikings</div>
+    </div>
 </body>
 
 </html>

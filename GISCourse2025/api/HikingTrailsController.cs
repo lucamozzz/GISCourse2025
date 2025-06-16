@@ -30,6 +30,7 @@ namespace GISCourse2025.API
                 {
                     p.id,
                     p.name,
+                    p.sac_scale,
                     p.geometry
                 })
                 .FirstOrDefault();
@@ -44,6 +45,7 @@ namespace GISCourse2025.API
             {
                 id = trail.id,
                 name = trail.name,
+                sac_scale = trail.sac_scale,
                 wkt = wkt
             });
         }
@@ -66,6 +68,7 @@ namespace GISCourse2025.API
                 {
                     id = new Random().Next(1000000000, 2000000000),
                     name = name,
+                    sac_scale = geometryDto.sac_scale,
                     geometry = geometry
                 };
 
@@ -80,31 +83,6 @@ namespace GISCourse2025.API
             }
         }
 
-
-        // [HttpPut("update/{id}/{name}")]
-        // public IActionResult UpdateName(int id, string name)
-        // {
-        //     if (string.IsNullOrWhiteSpace(name))
-        //         return BadRequest("Name cannot be empty.");
-
-        //     try
-        //     {
-        //         var entity = _context.Set<hikingTrails>().Find(id);
-
-        //         if (entity == null)
-        //             return NotFound($"Entity with id {id} not found.");
-
-        //         entity.name = name;
-        //         _context.SaveChanges();
-
-        //         return Ok();
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         return StatusCode(500, "Server error: " + ex.Message);
-        //     }
-        // }
-
         [HttpPut("update")]
         public IActionResult UpdateLine([FromBody] TrailUpdateDTO data)
         {
@@ -113,6 +91,7 @@ namespace GISCourse2025.API
                 return NotFound();
 
             trail.name = data.name;
+            trail.sac_scale = data.sac_scale;
 
             var reader = new WKTReader();
             trail.geometry = reader.Read(data.wkt);

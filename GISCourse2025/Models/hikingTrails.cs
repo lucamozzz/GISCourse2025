@@ -7,6 +7,7 @@ namespace GISCourse2025.Models
     {
         public int id { get; set; }
         public string? name { get; set; }
+        public string? sac_scale { get; set; }
         public Geometry geometry { get; set; }
     }
 }

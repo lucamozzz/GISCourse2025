@@ -131,10 +131,6 @@
                 return;
             }
 
-            // Clona e trasforma la geometria da 3857 a 4326
-            @* const geometry = drawnFeature.getGeometry().clone();
-            geometry.transform('EPSG:3857', 'EPSG:4326'); *@
-
             const geometry = drawnFeature.getGeometry()
             const type = geometry.getType();
             let polygons = [];
