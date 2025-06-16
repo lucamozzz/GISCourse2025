@@ -19,7 +19,7 @@ namespace GISCourse2025.Controllers
 
             if (!string.IsNullOrEmpty(search))
             {
-                hikingTrailsQuery = hikingTrailsQuery.Where(k => k.name.Contains(search));
+                hikingTrailsQuery = hikingTrailsQuery.Where(k => k.name.ToLower().Contains(search.ToLower()));
             }
 
             if (!string.IsNullOrEmpty(sacScale))

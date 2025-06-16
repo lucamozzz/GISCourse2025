@@ -12,13 +12,19 @@ namespace GISCourse2025.Controllers
         {
             this.context = context;
         }
-        public IActionResult Index()
+        public IActionResult Index(string search)
         {
-            List<viewpoints> viewpoints1 = context.viewpoints
-                .Where(k => k.id > 0 && k.name != null)
-                // .OrderBy(k => k.name)
-                // .Take(15)
-                .ToList();
+            var viewpointsQuery = context.viewpoints
+                .Where(k => k.id > 0 && k.name != null);
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                viewpointsQuery = viewpointsQuery.Where(k => k.name.ToLower().Contains(search.ToLower()));
+            }
+
+            ViewBag.Search = search;
+
+            var viewpoints1 = viewpointsQuery.ToList();
             return View("Viewpoints", viewpoints1);
         }
     }

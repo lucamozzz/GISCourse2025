@@ -21,17 +21,24 @@
         <tr>
             <td width="20%" style="vertical-align: top;">
                 <div style="margin-top: 20%; margin-right: 10%;">
-                    <h3 style="text-align: right;">List of Parks</h3>
-                    @foreach (parks m in Model)
-                    {
-                        <h5 style="text-align: right;">
-                            <a class="text-dark" style="text-decoration: none;" href="#" onclick="loadPark(@m.id)">
-                                @m.name
-                            </a>
-                            <a href="#" onclick="deletePark(@m.id)"
-                                style="color:red; text-decoration:none; margin-left:8px;">&#10005;</a>
-                        </h5>
-                    }
+                    <form method="get" style="text-align: right; margin-bottom: 10px;">
+                        <input type="text" name="search" placeholder="Search by name" value="@ViewBag.Search" />
+                        <button type="submit">Search</button>
+                    </form>
+                    <div style="margin-top: 20%; margin-right: 10%; max-height: 600px; overflow-y: auto;">
+                        <div>
+                            @foreach (parks m in Model)
+                            {
+                                <h5 style="text-align: right;">
+                                    <a class="text-dark" style="text-decoration: none;" href="#" onclick="loadPark(@m.id)">
+                                        @m.name
+                                    </a>
+                                    <a href="#" onclick="deletePark(@m.id)"
+                                        style="color:red; text-decoration:none; margin-left:8px;">&#10005;</a>
+                                </h5>
+                            }
+                        </div>
+                    </div>
                 </div>
             </td>
             <td valign="top">
